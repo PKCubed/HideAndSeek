@@ -9,11 +9,17 @@ from network import Network
 from player import Player
 
 import pygame.midi
+import pygame.mixer as mixer
 import time
 
 import threading
  
 pygame.init()
+mixer.init()
+
+mixer.music.load("Breathing.mp3")
+
+mixer.music.set_volume(0)
 
 player_size = 50
 player_acceleration = 0.5
@@ -139,9 +145,15 @@ def music_thread():
 if not seeker:
     MusicThread = threading.Thread(target=music_thread)
     MusicThread.start()
+else:
+    mixer.music.play(-1) # play breething on loop
+
+hider_distance = None
 
 while running:
     players, seeker_pos = n.send(p)
+    if not seeker_pos:
+        seeker_pos = (-10000, -10000)
 
     screen.fill((0, 0, 0))
   
@@ -245,7 +257,7 @@ while running:
         my_y = int(my_y_old + vectory*(threshhold))
 
     if not seeker:
-        seeker_distance = math.sqrt(abs(seeker_pos[0]-screen.get_width()/2-my_x)**2+abs(seeker_pos[1]-screen.get_height()/2-my_y)**2) # Pull yet another pythagorous hehe
+        seeker_distance = math.sqrt(abs(seeker_pos[0]-screen.get_width()/2-my_x)**2+abs(seeker_pos[1]-screen.get_height()/2-my_y)**2) # Do the pythagorous again hehe
 
         if seeker_distance < player_size:
             print("GAME OVER")
@@ -273,8 +285,6 @@ while running:
             music_speed = (((seeker_distance/800))*0.5)
         else:
             music_speed = 1
-    
-        
 
     my_x_old = my_x
     my_y_old = my_y
@@ -284,8 +294,26 @@ while running:
     draw_map(my_x, my_y)
 
     if players:
+        min_pl_distance = None
         for pl in players:
             draw_other_player(pl)
+
+            if seeker:
+                if pl:
+                    pl_distance = math.sqrt(abs(my_x-(pl.x-screen.get_width()/2))**2+abs(my_y-(pl.y-screen.get_height()/2))**2) # Pull yet another pythagorous hehe
+                    if not min_pl_distance or pl_distance < min_pl_distance:
+                        min_pl_distance = pl_distance
+
+        hider_distance = min_pl_distance
+        if hider_distance:
+            if hider_distance < 1000:
+                mixer.music.set_volume((1-(hider_distance/1000))*1)
+                print((1-(hider_distance/1000))*1)
+            else:
+                mixer.music.set_volume(0)
+        else:
+            mixer.music.set_volume(0)
+
 
     draw_player(screen.get_width()/2-player_size/2, screen.get_height()/2-player_size/2, player_color)
 
