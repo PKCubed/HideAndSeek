@@ -111,7 +111,7 @@ def draw_vision_blocker():
 player_color = p.color
 
 music_volume = 0
-music_speed = 5
+music_speed = 1
 
 pygame.midi.init()
 music_player = pygame.midi.Output(0)
@@ -127,6 +127,7 @@ def music_thread():
         music_player.note_on(64, music_volume)
         time.sleep(music_speed*1.5)
         music_player.note_off(64, music_volume)
+        time.sleep(0.1)
         music_player.note_on(65, music_volume)
         time.sleep(0.1)
         music_player.note_off(65, music_volume)
@@ -265,11 +266,11 @@ while running:
 
 
         if seeker_distance < 1000:
-            music_volume = int((1-(seeker_distance/1000))*255)
+            music_volume = int((1-(seeker_distance/1000))*127)
         else:
             music_volume = 0
-        if seeker_distance < 400:
-            music_speed = (((seeker_distance/400))*0.5)
+        if seeker_distance < 600:
+            music_speed = (((seeker_distance/800))*0.5)
         else:
             music_speed = 1
     
