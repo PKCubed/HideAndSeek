@@ -39,8 +39,8 @@ player_friction = 0.2
 
 comp_radius = 50
 
-player_vision = 1
-seeker_vision = 1.5
+player_vision = 0.8
+seeker_vision = 1.2
 
 seeker_topspeed = 7
 seeker_acceleration = 0.5
@@ -200,7 +200,6 @@ def music_thread():
     print("Starting Music Thread")
     music_player.set_instrument(0)
     while running:
-        print("Playing music")
         music_player.note_on(64, music_volume)
         time.sleep(music_speed*1.5)
         music_player.note_off(64, music_volume)
@@ -408,7 +407,6 @@ while running:
         if hider_distance:
             if hider_distance < 1000:
                 mixer.music.set_volume((1-(hider_distance/1000))*1)
-                print((1-(hider_distance/1000))*1)
             else:
                 mixer.music.set_volume(0)
         else:
