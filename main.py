@@ -1,3 +1,12 @@
+"""
+Things to add
+
+x Serverside map loading
+
+"""
+
+
+
 import sys
 
 import math
@@ -11,6 +20,8 @@ from player import Player
 import pygame.midi
 import pygame.mixer as mixer
 import time
+
+import os
 
 import threading
  
@@ -48,9 +59,10 @@ fps = 60
 fpsClock = pygame.time.Clock()
  
 width, height = 800, 600
-screen = pygame.display.set_mode((width, height))
+screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 
-map_image = pygame.image.load("map.png").convert()
+map_image = None
+map_hbimage = None
  
 seeker_pos = (0,0)
 
@@ -82,12 +94,65 @@ def is_collision(colors):
         return False
 
 
+difference_height = 0
+difference_width = 0
+
 # Game loop.
 
 n = Network()
-p = n.getP()
+data = n.getP()
+
+p = data
 
 seeker = p.seeker
+
+if not os.path.exists("map.png") or not os.path.exists("map_hitbox.png"):
+
+    n.need_map()
+
+
+    print("waiting for map image")
+
+    # Load map images from server
+    with open("map.png", "wb") as f:
+        while True:
+            # read 1024 bytes from the socket (receive)
+            bytes_read = n.get_map()
+            try:
+                if bytes_read.decode() == "mapdone":    
+                    # nothing is received
+                    # file transmitting is done
+                    break
+            except:
+                pass
+            # write to the file the bytes we just received
+            f.write(bytes_read)
+
+    print("map1 loaded")
+
+    # Load map images from server
+    with open("map_hitbox.png", "wb") as f:
+        while True:
+            # read 1024 bytes from the socket (receive)
+            bytes_read = n.get_map()
+            try:
+                if bytes_read.decode() == "mapdone":    
+                    # nothing is received
+                    # file transmitting is done
+                    break
+            except:
+                pass
+            # write to the file the bytes we just received
+            f.write(bytes_read)
+
+    print("map2 loaded")
+
+
+try:
+    map_image = pygame.image.load("map.png").convert()
+    map_hbimage = pygame.image.load("map_hitbox.png").convert()
+except:
+    print('IMAGE ERROR: PLEASE DELETE "map.png" AND "map_hitbox.png" AND RUN "main.py" AGAIN')
 
 my_x = p.x
 my_y = p.y
@@ -99,17 +164,23 @@ if seeker:
 else:
     print("You are HIDER!")
 
-# Vision "Vingette"
-blocker_surface = pygame.Surface((width, height))
-blocker_surface = blocker_surface.convert_alpha()
-blocker_surface.fill((0, 255, 0, 255))
-center_screen = (screen.get_width()/2, screen.get_height()/2)
-for ix in range(screen.get_width()):
-    for iy in range(screen.get_height()):
-        pixel_distance = math.sqrt(abs(center_screen[0] - ix)**2 + abs(center_screen[1] - iy)**2) / player_vision # Do the pythagorous lol ( d = sqrt(x^2 + y^2) )
-        if pixel_distance > 255:
-            pixel_distance = 255
-        blocker_surface.set_at((ix, iy), (0,0,0,pixel_distance))
+blocker_surface = None
+
+def render_vision():
+    global blocker_surface
+    # Vision "Vingette"
+    blocker_surface = pygame.Surface((screen.get_width(), screen.get_height()))
+    blocker_surface = blocker_surface.convert_alpha()
+    blocker_surface.fill((0, 255, 0, 255))
+    center_screen = (screen.get_width()/2, screen.get_height()/2)
+    for ix in range(screen.get_width()):
+        for iy in range(screen.get_height()):
+            pixel_distance = math.sqrt(abs(center_screen[0] - ix)**2 + abs(center_screen[1] - iy)**2) / player_vision # Do the pythagorous lol ( d = sqrt(x^2 + y^2) )
+            if pixel_distance > 255:
+                pixel_distance = 255
+            blocker_surface.set_at((ix, iy), (0,0,0,pixel_distance))
+
+render_vision()
 
 def draw_vision_blocker():
     screen.blit(blocker_surface, (0,0))
@@ -150,8 +221,18 @@ else:
 
 hider_distance = None
 
+last_message = 0
+
+old_width = screen.get_width()
+old_height = screen.get_height()
+
 while running:
-    players, seeker_pos = n.send(p)
+    players, seeker_pos, message = n.send(p)
+
+    if message[0] != last_message:
+        last_message = message[0]
+        print(message[1])
+
     if not seeker_pos:
         seeker_pos = (-10000, -10000)
 
@@ -161,6 +242,15 @@ while running:
         if event.type == QUIT:
             running = False
             break
+        elif event.type == VIDEORESIZE: # When window is resized
+            render_vision()
+            #Find resize amound and fix at bottom of game loop
+            difference_width = screen.get_width() - old_width
+            difference_height = screen.get_height() - old_height
+            old_width = screen.get_width()
+            old_height = screen.get_height()
+            
+
   
 
 
@@ -217,10 +307,10 @@ while running:
     hitbox_point3 = (int(screen.get_width()/2-player_size/2 + my_x), int(screen.get_height()/2+player_size/2 + my_y))
     hitbox_point4 = (int(screen.get_width()/2+player_size/2 + my_x), int(screen.get_height()/2+player_size/2 + my_y))
 
-    color1 = map_image.get_at((hitbox_point1))
-    color2 = map_image.get_at((hitbox_point2))
-    color3 = map_image.get_at((hitbox_point3))
-    color4 = map_image.get_at((hitbox_point4))
+    color1 = map_hbimage.get_at((hitbox_point1))
+    color2 = map_hbimage.get_at((hitbox_point2))
+    color3 = map_hbimage.get_at((hitbox_point3))
+    color4 = map_hbimage.get_at((hitbox_point4))
 
     
     if is_collision((color1, color2, color3, color4)):
@@ -239,6 +329,9 @@ while running:
 
             threshhold -= incriment
 
+            if threshhold < 0:
+                break
+
             my_x = my_x_old + vectorx*threshhold
             my_y = my_y_old + vectory*threshhold
 
@@ -248,10 +341,10 @@ while running:
             hitbox_point3 = (int(screen.get_width()/2-player_size/2 + my_x), int(screen.get_height()/2+player_size/2 + my_y))
             hitbox_point4 = (int(screen.get_width()/2+player_size/2 + my_x), int(screen.get_height()/2+player_size/2 + my_y))
 
-            color1 = map_image.get_at((hitbox_point1))
-            color2 = map_image.get_at((hitbox_point2))
-            color3 = map_image.get_at((hitbox_point3))
-            color4 = map_image.get_at((hitbox_point4))
+            color1 = map_hbimage.get_at((hitbox_point1))
+            color2 = map_hbimage.get_at((hitbox_point2))
+            color3 = map_hbimage.get_at((hitbox_point3))
+            color4 = map_hbimage.get_at((hitbox_point4))
 
         my_x = int(my_x_old + vectorx*(threshhold))
         my_y = int(my_y_old + vectory*(threshhold))
@@ -288,6 +381,13 @@ while running:
 
     my_x_old = my_x
     my_y_old = my_y
+
+    # Fix window resize problems
+    if difference_height or difference_width:
+        my_x -= difference_width/2
+        my_y -= difference_height/2
+        difference_width = 0
+        difference_height = 0
 
     # Draw.
 

@@ -25,10 +25,16 @@ class Network:
         try:
             self.client.send(pickle.dumps(data))
             try:
-                backdata, seeker_pos = pickle.loads(self.client.recv(2048))
-                return backdata, seeker_pos
+                backdata, seeker_pos, message = pickle.loads(self.client.recv(2048))
+                return backdata, seeker_pos, message
             except:
                 print("No players connected")
-                return [], (0,0)
+                return [], (0,0), [0, ""]
         except socket.error as e:
             print(e)
+
+    def get_map(self):
+        return self.client.recv(4096)
+    
+    def need_map(self):
+        self.client.send(pickle.dumps("getmap"))
